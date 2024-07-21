@@ -23,7 +23,7 @@ http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mu
       level="INFO"
       doc:name="Account properties"
       doc:id="b9253ed3-2ae0-4538-a37c-0156e18a05c9"
-      message='#[output text/plain&#10;---&#10;["Querying Salesforce for Account:", vars.accountId as String] joinBy " "]'
+      message='#[output text/plain&#10;---&#10;["Querying Salesforce for Account with id:", vars.accountId as String] joinBy " "]'
       category="Accounts" />
     <salesforce:query
       doc:name="Query Account by Id"
