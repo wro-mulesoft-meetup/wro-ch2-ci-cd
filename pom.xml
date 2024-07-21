@@ -4,7 +4,7 @@
 
   <groupId>1dcd9f0f-d1da-4780-8590-4834d72a66f2</groupId>
   <artifactId>wro-ch2-ci-cd-app</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1-SNAPSHOT</version>
   <packaging>mule-application</packaging>
   <name>wro-ch2-ci-cd</name>
 
@@ -84,7 +84,7 @@
 
   <scm>
     <connection>scm:git:https://${git_token}@github.com/wro-mulesoft-meetup/wro-ch2-ci-cd.git</connection>
-    <tag>v1.0.0</tag>
+    <tag>HEAD</tag>
   </scm>
 
   <dependencies>
