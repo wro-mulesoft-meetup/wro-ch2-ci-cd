@@ -1,0 +1,208 @@
+name: Deploy to Cloudhub 2.0
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Runtime Manager Environment to deploy it to'
+        type: choice
+        options:
+        - DEV
+        - QAS
+        - PRD
+      version:
+        description: 'Application Version (Available on Exchange)'
+        type: string
+        required: true
+
+env:
+  connected_app_clientId: ${{ secrets.MULESOFT_CONNECTED_APP_CLIENT_ID }}
+  connected_app_clientSecret: ${{ secrets.MULESOFT_CONNECTED_APP_CLIENT_SECRET }}
+  organization_id: ${{ vars.ORGANIZATION_ID}} 
+  environment: ${{ inputs.environment }}
+  version: ${{ inputs.version }}
+
+jobs:
+
+  setup-properties:
+    name: Setup deployment properties
+    outputs:
+      configuration_env: ${{ steps.set-configuration-env.outputs.configuration_env }}
+      app_name: ${{ steps.set-app-name.outputs.app_name }}
+      artifact_id: ${{ steps.set-artifact-id.outputs.artifact_id }}
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Set env configuration property
+        id: set-configuration-env
+        run: |
+          echo "configuration_env=$(echo "${{ env.environment }}" | awk '{print tolower($0)}')" >> $GITHUB_OUTPUT
+
+      - name: Set application prefix
+        id: set-app-prefix
+        run: |
+          if [[ ${{ env.environment }} != "PRD" ]]; then
+            echo "app_prefix=${{ steps.set-configuration-env.outputs.configuration_env }}-" >> $GITHUB_OUTPUT
+          else
+            echo "app_prefix=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set application suffix
+        id: set-app-suffix
+        run: |
+          echo "app_suffix=-v$(echo ${{ env.version }} | cut -c 1)" >> $GITHUB_OUTPUT
+
+      - name: Set application name
+        id: set-app-name
+        run: |
+          repo_name=${{ github.event.repository.name }}
+          echo "app_name=${{ steps.set-app-prefix.outputs.app_prefix }}${{ github.event.repository.name }}${{ steps.set-app-suffix.outputs.app_suffix }}" >> $GITHUB_OUTPUT
+
+      - name: Set artifact id
+        id: set-artifact-id
+        run: |
+            repo_name=${{ github.event.repository.name }}
+            echo "artifact_id=$repo_name-app" >> $GITHUB_OUTPUT
+
+  deploy-to-CH-2:
+    needs: [setup-properties]
+    name: Deploy to Cloudhub 2.0
+    runs-on: ubuntu-latest
+    env:
+      app_name: ${{ needs.setup-properties.outputs.app_name }}
+      configuration_env: ${{ needs.setup-properties.outputs.configuration_env }}
+      artifact_id: ${{ needs.setup-properties.outputs.artifact_id }}
+      secure_key: ${{ secrets.SECURE_KEY}}  
+      deployment_target: ${{ vars.DEPLOYMENT_TARGET}} 
+      runtime_version: ${{ vars.RUNTIME_VERSION}}  
+      java_version: ${{ vars.JAVA_VERSION}}  
+      release_channel: ${{ vars.RELEASE_CHANNEL}}  
+      replicas: ${{ vars.REPLICAS}}  
+      replica_size: ${{ vars.REPLICA_SIZE}}  
+      update_strategy: ${{ vars.UPTATE_STRATEGY}}  
+      scope_logging_config: ${{ vars.SCOPE_LOGGING_CONFIG}}
+      vizualizer_tags: ${{ vars.VIZUALIZER_TAGS}}
+      vizualizer_layer: ${{ vars.VIZUALIZER_LAYER}}
+      anypoint_platform_client_id: ${{ secrets.ANYPOINT_PLATFORM_CLIENT_ID }}
+      anypoint_platform_client_secret: ${{ secrets.ANYPOINT_PLATFORM_CLIENT_SECRET }}
+
+    steps:
+
+    - name: Install anypoint cli
+      run: |
+        sudo apt-get update
+        npm install -g anypoint-cli-v4
+
+    - name: Install runtime manager plugin
+      run: |
+        sudo apt-get update  
+        anypoint-cli-v4 plugins:install anypoint-cli-runtime-mgr-plugin
+
+    - name: Check running applications
+      id: check-running-applications
+      run: |  
+         app_list=$(anypoint-cli-v4 runtime-mgr:application:list --client_id ${{ env.connected_app_clientId }} --client_secret ${{ env.connected_app_clientSecret }} --organization ${{ env.organization_id }} --environment ${{ env.environment }} -o json)
+         echo $app_list | jq '.[]'
+         echo "app_list="$app_list"" >> $GITHUB_OUTPUT
+
+    - name: Get Application properties
+      id: get-app-properties
+      run: |  
+        transformedList=${{ toJson(steps.check-running-applications.outputs.app_list) }}
+        app_properties=$(echo $transformedList | jq '.[] | select(.name == "${{ env.app_name}}")')
+        if [ -n "$app_properties" ]
+        then
+            echo PROPERTIES FOUND:
+            echo $app_properties | jq '.' 
+            echo "new_application=false" >> $GITHUB_OUTPUT
+            echo "app_properties="$app_properties"" >> $GITHUB_OUTPUT
+        else
+            echo NO PROPERTIES FOUND. THIS IS A NEW APPLICATION.
+            echo "new_application=true" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Deploy new Application
+      id: deploy-new-app
+      if: ${{ fromJson(steps.get-app-properties.outputs.new_application) }}
+      run: |
+        anypoint-cli-v4 runtime-mgr:application:deploy \
+        ${{ env.app_name }} \
+        ${{ env.deployment_target }} \
+        ${{ env.runtime_version }} \
+        ${{ env.artifact_id }} \
+        --client_id ${{ env.connected_app_clientId }} \
+        --client_secret ${{ env.connected_app_clientSecret }} \
+        --organization ${{ env.organization_id }} \
+        --environment ${{ env.environment }} \
+        --assetVersion ${{ env.version }} \
+        --objectStoreV2 \
+        --javaVersion ${{ env.java_version }} \
+        --releaseChannel ${{ env.release_channel }} \
+        --replicas ${{ env.replicas }} \
+        --replicaSize ${{ env.replica_size }} \
+        --updateStrategy ${{ env.update_strategy }} \
+        --secureProperty secureKey:${{ env.secure_key }} \
+        --secureProperty anypoint.platform.client_id:${{ env.anypoint_platform_client_id }} \
+        --secureProperty anypoint.platform.client_secret:${{ env.anypoint_platform_client_secret }} \
+        --property env:${{ env.configuration_env }} \
+        --property anypoint.platform.visualizer.tags:${{ env.vizualizer_tags}} \
+        --property anypoint.platform.visualizer.layer:${{ env.vizualizer_layer}} \
+        --scopeLoggingConfig ${{ env.scope_logging_config }} \
+        -o json
+ 
+    - name: Update existing Application
+      id: update-existing-app
+      if: ${{ !fromJson(steps.get-app-properties.outputs.new_application) }}
+      run: |
+        app_properties=${{ toJson(steps.get-app-properties.outputs.app_properties) }}
+        app_id=$(echo $app_properties | jq '.id' --raw-output)
+        echo APP ID: $app_id
+        echo "app_id=$app_id" >> $GITHUB_OUTPUT     
+        anypoint-cli-v4 runtime-mgr:application:modify \
+        $app_id \
+        --client_id ${{ env.connected_app_clientId }} \
+        --client_secret ${{ env.connected_app_clientSecret }} \
+        --organization ${{ env.organization_id }} \
+        --environment ${{ env.environment }} \
+        --assetVersion ${{ env.version }} \
+        --groupId ${{ env.organization_id }} \
+        --artifactId ${{ env.artifact_id }} \
+        --objectStoreV2 \
+        --javaVersion ${{ env.java_version }} \
+        --releaseChannel ${{ env.release_channel }} \
+        --replicas ${{ env.replicas }} \
+        --replicaSize ${{ env.replica_size }} \
+        --updateStrategy ${{ env.update_strategy }} \
+        --secureProperty secureKey:${{ env.secure_key }} \
+        --secureProperty anypoint.platform.client_id:${{ env.anypoint_platform_client_id }} \
+        --secureProperty anypoint.platform.client_secret:${{ env.anypoint_platform_client_secret }} \
+        --property env:${{ env.configuration_env }} \
+        --property anypoint.platform.visualizer.tags:${{ env.vizualizer_tags}} \
+        --property anypoint.platform.visualizer.layer:${{ env.vizualizer_layer}} \
+        --scopeLoggingConfig ${{ env.scope_logging_config }} \
+        -o json
+
+    - name: Summary
+      run: |
+         echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+         echo "| --------------- | -------------- |" >> $GITHUB_STEP_SUMMARY
+         echo "| New application? | ${{ steps.get-app-properties.outputs.new_application }} |" >> $GITHUB_STEP_SUMMARY
+         if  ${{ !fromJson(steps.get-app-properties.outputs.new_application) }}
+         then
+            echo "| App Id | ${{ steps.update-existing-app.outputs.app_id }} |" >> $GITHUB_STEP_SUMMARY
+         fi
+         echo "| Version | $version |" >> $GITHUB_STEP_SUMMARY
+         echo "| Environment | $environment |" >> $GITHUB_STEP_SUMMARY
+         echo "| Application name | ${{ env.app_name }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Deployment target | ${{ env.deployment_target }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Runtime version | ${{ env.runtime_version }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Organization Id | ${{ env.organization_id }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Java version | ${{ env.java_version }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Release channel | ${{ env.release_channel }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Replicas | ${{ env.replicas }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Replica size | ${{ env.replica_size }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Update strategy | ${{ env.update_strategy }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Scope logging config | ${{ env.scope_logging_config }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Vizualizer tags | ${{ env.vizualizer_tags }} |" >> $GITHUB_STEP_SUMMARY
+         echo "| Vizualizer layer | ${{ env.vizualizer_layer }} |" >> $GITHUB_STEP_SUMMARY

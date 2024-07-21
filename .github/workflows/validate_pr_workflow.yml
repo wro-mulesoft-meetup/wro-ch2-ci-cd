@@ -1,0 +1,84 @@
+name: Validate Pull Request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+env:
+  nexus_username: ${{ secrets.MULESOFT_NEXUS_USERNAME }}
+  nexus_password: ${{ secrets.MULESOFT_NEXUS_PASSWORD }}
+  connected_app_clientId: ${{ secrets.MULESOFT_CONNECTED_APP_CLIENT_ID }}
+  connected_app_clientSecret: ${{ secrets.MULESOFT_CONNECTED_APP_CLIENT_SECRET }}
+  path_maven_settings: ${{ github.workspace }}/.maven/settings.xml
+
+jobs:
+
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout this repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    - name: Validate & Compile
+      run: mvn -B -s ${{ env.path_maven_settings }} clean compile
+
+  test:
+    name: Test
+    needs: [compile]
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ needs.get-version.outputs.app_version }}
+
+    steps:
+
+    - name: Checkout this repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    - name: Run MUnit tests
+      id: munit-tests
+      run: mvn -B -s ${{ env.path_maven_settings }} clean test
+
+    - name: Test Summary
+      if: always()
+      uses: test-summary/action@v2
+      with:
+        paths: "**/surefire-reports/TEST-*.xml"
+
+    - name: Upload MUnit reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: munit-test-reports
+        path: target/site/munit/coverage/
