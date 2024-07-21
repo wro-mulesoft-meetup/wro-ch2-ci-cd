@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	  xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+  xmlns:salesforce-composite="http://www.mulesoft.org/schema/mule/salesforce-composite"
+  xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties"
+  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+  xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd 
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/salesforce-composite http://www.mulesoft.org/schema/mule/salesforce-composite/current/mule-salesforce-composite.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+  <configuration-properties
+    doc:name="env-config-properties"
+    doc:id="b56503d0-30c2-40f7-a5ad-8d690fd40316"
+    file="config/${env}/config.yaml" />
+
+  <configuration-properties
+    doc:name="default-properties"
+    doc:id="887123a7-cdf4-4610-b957-c6395ec8ddb3"
+    file="config\config.yaml" />
+
+  <secure-properties:config
+    name="secure-properties-config"
+    doc:name="Secure Properties Config"
+    doc:id="8f127b87-295a-4ddc-9076-b35b9f6364a6"
+    file="config/${env}/passwords.yaml"
+    key="${secureKey}">
+    <secure-properties:encrypt algorithm="Blowfish" />
+  </secure-properties:config>
+
+  <apikit:config
+    name="wro-ch2-ci-cd-config"
+    api="resource::1dcd9f0f-d1da-4780-8590-4834d72a66f2:wro-ch2-ci-cd:1.0.0:raml:zip:wro-ch2-ci-cd.raml"
+    outboundHeadersMapName="outboundHeaders"
+    httpStatusVarName="httpStatus" />
+
+  <api-gateway:autodiscovery
+    apiId="${api.id}"
+    ignoreBasePath="true"
+    doc:name="API Autodiscovery"
+    doc:id="265818bf-a7b8-436a-b75e-3974a2b009bc"
+    flowRef="${api.flow}" />
+
+  <http:listener-config name="http-listener-config">
+    <http:listener-connection
+      host="${http.host}"
+      port="${http.port}"
+      readTimeout="${http.readTimeout}" />
+  </http:listener-config>
+
+  <salesforce:sfdc-config
+    name="salesforce-config"
+    doc:name="Salesforce Config"
+    doc:id="6bb265b7-7726-477e-90b3-58f84641d6eb">
+    <salesforce:oauth-user-pass-connection
+      consumerKey="${salesforce.consumerKey}"
+      consumerSecret="${secure::salesforce.consumerSecret}"
+      username="${salesforce.username}"
+      password="${secure::salesforce.password}"
+      securityToken="${secure::salesforce.securityToken}"
+      tokenEndpoint="${salesforce.tokenEndpoint}" />
+  </salesforce:sfdc-config>
+
+</mule>

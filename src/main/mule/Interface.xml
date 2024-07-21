@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+  xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+
+  <flow name="wro-ch2-ci-cd-main">
+    <http:listener
+      config-ref="http-listener-config"
+      path="/api/*">
+      <http:response statusCode="#[vars.httpStatus default 200]">
+        <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+      </http:response>
+      <http:error-response statusCode="#[vars.httpStatus default 500]">
+        <http:body><![CDATA[#[payload]]]></http:body>
+        <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
+      </http:error-response>
+    </http:listener>
+    <logger
+      level="INFO"
+      doc:name="request in"
+      doc:id="affc2ec4-1491-4cf2-9a57-90f93ddf2e27"
+      category="RequestIn"
+      message="#[[(attributes.method default &quot;&quot;),(attributes.requestUri default &quot;&quot;)] joinBy &quot; &quot;]" />
+    <apikit:router config-ref="wro-ch2-ci-cd-config" />
+    <logger
+      level="DEBUG"
+      doc:name="response out"
+      doc:id="a392d47b-7fcb-4933-8b3b-051944036eaf"
+      message="#[%dw 2.0&#xA;output text/plain&#xA;---&#xA;write(payload,&quot;application/json&quot;)]"
+      category="ResponseOut" />
+    <logger
+      level="INFO"
+      doc:name="response out"
+      doc:id="5de52b3b-d3de-4765-9f7a-d9f197526c5b"
+      message="#[%dw 2.0&#xA;output text/plain&#xA;---&#xA;&quot;Processing finished&quot;]"
+      category="ResponseOut" />
+    <error-handler>
+      <on-error-propagate
+        type="APIKIT:BAD_REQUEST,APIKIT:NOT_FOUND,APIKIT:METHOD_NOT_ALLOWED,APIKIT:NOT_ACCEPTABLE,APIKIT:UNSUPPORTED_MEDIA_TYPE"
+        enableNotifications="true"
+        logException="true">
+        <ee:transform
+          doc:name="Transform Message"
+          doc:id="d5725308-6977-4f80-a7c5-d78f44577bd3">
+          <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from dw::error_util
+
+var errorType = getErrorType(error)
+
+var message =
+  error.errorType.identifier match {
+    case identifier if(identifier == "BAD_REQUEST") -> error.detailedDescription default "Bad Request"
+    case identifier if(identifier == "NOT_IMPLEMENTED") -> [attributes.method, attributes.requestPath, error.detailedDescription] joinBy " " default "Not Implemented"
+    case identifier if(identifier == "NOT_FOUND") -> [error.detailedDescription, "Resource not found"] joinBy " " default "Resource Not Found"
+    case identifier if(identifier == "METHOD_NOT_ALLOWED") -> error.detailedDescription default "Method Not Allowed"  
+    case identifier if(identifier == "NOT_ACCEPTABLE") -> [attributes.headers.accept, error.detailedDescription] joinBy " " default "Not Acceptable"
+    case identifier if(identifier == "UNSUPPORTED_MEDIA_TYPE") -> [attributes.headers.'content-type', error.detailedDescription] joinBy " " default "Unsupported Media Type"
+  }
+---
+errorResponse(correlationId, errorType, message)]]></ee:set-payload>
+          </ee:message>
+          <ee:variables>
+            <ee:set-variable variableName="httpStatus"><![CDATA[error.errorType.identifier match {
+  case identifier if(identifier == "BAD_REQUEST") -> 400
+    case identifier if(identifier == "NOT_IMPLEMENTED") -> 501
+    case identifier if(identifier == "NOT_FOUND") -> 404
+    case identifier if(identifier == "METHOD_NOT_ALLOWED") -> 405
+    case identifier if(identifier == "NOT_ACCEPTABLE") -> 406
+    case identifier if(identifier == "UNSUPPORTED_MEDIA_TYPE") -> 415
+}]]></ee:set-variable>
+          </ee:variables>
+        </ee:transform>
+      </on-error-propagate>
+      <on-error-propagate
+        enableNotifications="true"
+        logException="true"
+        doc:name="On Error Propagate"
+        doc:id="c0da5f7b-3e73-43c7-96a0-0ef276769ded"
+        type="RECORD:NOT_FOUND">
+        <ee:transform
+          doc:name="Transform Message"
+          doc:id="615d75b7-4ec1-432e-a045-e238546ada55">
+          <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from dw::error_util
+
+var errorType = getErrorType(error)
+---
+errorResponse(correlationId, errorType, error.description default "Record was not found")]]></ee:set-payload>
+          </ee:message>
+          <ee:variables>
+            <ee:set-variable variableName="httpStatus"><![CDATA[404]]></ee:set-variable>
+          </ee:variables>
+        </ee:transform>
+      </on-error-propagate>
+      <on-error-propagate
+        enableNotifications="true"
+        logException="true"
+        doc:name="On Error Propagate"
+        doc:id="a955ff74-7b49-4f72-9307-a282720f11d6"
+        type="ANY">
+        <ee:transform
+          doc:name="Transform Message"
+          doc:id="9e20dd74-562e-4a37-8614-f3ae0fe647d5">
+          <ee:message>
+            <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+import * from dw::error_util
+
+var errorType = getErrorType(error)
+---
+errorResponse(correlationId, errorType, error.description default "Internal Error")]]></ee:set-payload>
+          </ee:message>
+          <ee:variables>
+            <ee:set-variable variableName="httpStatus"><![CDATA[500]]></ee:set-variable>
+          </ee:variables>
+        </ee:transform>
+      </on-error-propagate>
+    </error-handler>
+  </flow>
+
+  <flow name="get:\accounts\(accountId):wro-ch2-ci-cd-config">
+    <flow-ref
+      doc:name="getAccountById"
+      doc:id="02ff541c-d2eb-45ba-b09a-33eca2eb499d"
+      name="getAccountById" />
+  </flow>
+
+</mule>

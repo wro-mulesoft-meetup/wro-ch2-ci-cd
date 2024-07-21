@@ -1,0 +1,20 @@
+{
+	"id": "0012o00003PlCQ3AAN",
+	"accountNumber": "2132234234",
+	"name": "Wayne Enterprises",
+	"industry": "Finance",
+	"type": "Customer - Channel",
+	"createdDate": "2023-10-30T11:51:59.000Z",
+	"createdById": "0052o00000D0zGUAAZ",
+	"isDeleted": false,
+	"billingAddress": {
+		"street": "Joker evenue",
+		"city": "Gotham",
+		"postalCode": "19-395",
+		"state": "New Jersey",
+		"country": "USA"
+	},
+	"ownerId": "0052o00000D0zGUAAZ",
+	"lastModifiedDate": "2023-10-30T14:26:57.000Z",
+	"lastModifiedById": "0052o00000D0zGUAAZ"
+}

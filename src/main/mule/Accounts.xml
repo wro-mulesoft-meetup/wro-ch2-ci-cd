@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+  xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+  xmlns:validation="http://www.mulesoft.org/schema/mule/validation"
+  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/validation http://www.mulesoft.org/schema/mule/validation/current/mule-validation.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+  <sub-flow
+    name="getAccountById"
+    doc:id="1b76904b-5b87-4a9b-9928-9407da0c4115">
+    <set-variable
+      value="#[attributes.uriParams.'accountId']"
+      doc:name="accountId"
+      doc:id="c2e23e4d-8256-4b7a-a745-be13cd6c3b52"
+      variableName="accountId" />
+    <logger
+      level="INFO"
+      doc:name="Account properties"
+      doc:id="b9253ed3-2ae0-4538-a37c-0156e18a05c9"
+      message='#[output text/plain&#10;---&#10;["Querying Salesforce for Account:", vars.accountId as String] joinBy " "]'
+      category="Accounts" />
+    <salesforce:query
+      doc:name="Query Account by Id"
+      doc:id="2376046e-8e33-4465-8dbf-ea1187f86115"
+      config-ref="salesforce-config">
+      <salesforce:salesforce-query><![CDATA[SELECT Id,          Name,             AccountNumber,
+	   Industry,    Type,             CreatedDate,
+	   CreatedById, IsDeleted,        BillingAddress,
+	   OwnerId,     LastModifiedDate, LastModifiedById
+  FROM Account
+ WHERE Id = ':accountId']]></salesforce:salesforce-query>
+      <salesforce:parameters><![CDATA[#[{
+	accountId: vars.accountId
+}]]]></salesforce:parameters>
+    </salesforce:query>
+    <logger
+      level="DEBUG"
+      doc:name="response"
+      doc:id="5c033642-558d-4dc4-a0c9-ad1012c1f0ac"
+      message='#[%dw 2.0&#10;output text/plain&#10;---&#10;write(payload,"application/json")]'
+      category="Accounts" />
+    <validation:is-not-empty-collection
+      doc:name="account found"
+      doc:id="f4619970-9e53-4344-9e61-f7431422d331"
+      message='#[["Account", vars.accountId as String, "was not found"] joinBy " "]'>
+      <error-mapping
+        sourceType="VALIDATION:EMPTY_COLLECTION"
+        targetType="RECORD:NOT_FOUND" />
+    </validation:is-not-empty-collection>
+    <logger
+      level="INFO"
+      doc:name="response"
+      doc:id="9558c880-0735-4aa3-883d-56a803a73845"
+      message='#[%dw 2.0&#10;output text/plain&#10;---&#10;["Account", vars.accountId as String, "found"] joinBy " "]'
+      category="Accounts" />
+    <ee:transform
+      doc:name="transform Account"
+      doc:id="57548078-80c5-4f4e-8b1d-58ff939ac39b">
+      <ee:message>
+        <ee:set-payload resource="dw/transform_account.dwl" />
+      </ee:message>
+    </ee:transform>
+    <logger
+      level="INFO"
+      doc:name="transformed Account"
+      doc:id="27f2083b-de21-4a7b-85f9-524bf9621bab"
+      message='#[%dw 2.0&#10;output text/plain&#10;---&#10;["Transformed Account:", vars.accountId as String, "\n", write(payload,"application/json")] joinBy " "]'
+      category="Accounts" />
+  </sub-flow>
+
+</mule>
