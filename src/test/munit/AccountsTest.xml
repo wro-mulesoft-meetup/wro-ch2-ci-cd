@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+  xmlns:tracing="http://www.mulesoft.org/schema/mule/tracing"
+  xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+  xmlns:munit-tools="http://www.mulesoft.org/schema/mule/munit-tools"
+  xmlns="http://www.mulesoft.org/schema/mule/core"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+  xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+		http://www.mulesoft.org/schema/mule/munit-tools  http://www.mulesoft.org/schema/mule/munit-tools/current/mule-munit-tools.xsd
+http://www.mulesoft.org/schema/mule/tracing http://www.mulesoft.org/schema/mule/tracing/current/mule-tracing.xsd">
+
+  <munit:config name="AccountsTest.xml" />
+
+  <munit:test
+    name="ShouldFail_GetAccountById_WhenAuthHeaderMissing"
+    doc:id="5990d17b-b374-4f2d-a4df-1b9cc61394b5"
+    description="GET Account by Id fails due to APIKIT:BAD_REQUEST">
+    <munit:execution>
+      <munit:set-event
+        doc:name="Set Event"
+        doc:id="6dde4f4a-0d53-4c28-a32e-8f2c95a468aa">
+        <munit:attributes
+          value='#[readUrl("classpath://accounts/get_by_id/request/attributes_without_auth.dwl") as Object {&#10;  class: "org.mule.extension.http.api.HttpRequestAttributes"&#10;}]' />
+      </munit:set-event>
+      <tracing:with-correlation-id
+        doc:name="With CorrelationID"
+        doc:id="e3757d51-cc69-4613-815b-cd4f52a92e18"
+        correlationId='#["munit-test-correlationId"]'>
+        <try
+          doc:name="Try"
+          doc:id="8cebe74b-6f87-4cdf-9e3d-ae2be71891d7">
+          <flow-ref
+            doc:name="wro-ch2-ci-cd-main"
+            doc:id="9d24ffa6-4ba1-4658-bd01-70f8a3e7660d"
+            name="wro-ch2-ci-cd-main" />
+          <error-handler>
+            <on-error-continue
+              enableNotifications="true"
+              logException="true"
+              doc:name="On Error Continue"
+              doc:id="3dabc5d5-dcee-4611-9843-c8790a85e2e9"
+              type="APIKIT:BAD_REQUEST" />
+          </error-handler>
+        </try>
+      </tracing:with-correlation-id>
+    </munit:execution>
+    <munit:validation>
+      <munit-tools:verify-call
+        doc:name="APIkit Router"
+        doc:id="d74700f1-f7ec-4556-af4e-967808967343"
+        processor="apikit:router"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="wro-ch2-ci-cd-config"
+            attributeName="config-ref" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="getAccountById"
+        doc:id="d7dc6646-fb67-4968-9276-7d78c0c88010"
+        processor="flow-ref"
+        times="0">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="02ff541c-d2eb-45ba-b09a-33eca2eb499d"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:assert-that
+        doc:name="httpStatus is correct"
+        doc:id="3bd5b76b-d760-4778-9962-7a655053f1bd"
+        is="#[MunitTools::equalTo(400)]"
+        message="HTTP status is not correct"
+        expression="#[vars.httpStatus]" />
+      <munit-tools:assert-that
+        doc:name="payload is correct"
+        doc:id="ed999ab5-45b3-49d6-83ec-885090eb156c"
+        is='#[output application/json --- MunitTools::equalTo(readUrl("classpath://accounts/get_by_id/response/bad-request-error.json"))]'
+        message="Payload is not correct!"
+        expression="#[output application/json --- payload]" />
+    </munit:validation>
+  </munit:test>
+
+  <munit:test
+    name="ShouldFail_GetAccountById_WhenSalesforceConnectivityError"
+    doc:id="83132711-6937-4cc0-8ca1-14d319432e5b"
+    description="GET Account by Id fails due to a connection error from Salesforce">
+    <munit:enable-flow-sources>
+      <munit:enable-flow-source value="get:\accounts\(accountId):wro-ch2-ci-cd-config" />
+    </munit:enable-flow-sources>
+    <munit:behavior>
+      <munit-tools:mock-when
+        doc:name="Query Account by Id"
+        doc:id="f13b8e08-e36d-4248-b5e0-25e7a1f31747"
+        processor="salesforce:query">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="2376046e-8e33-4465-8dbf-ea1187f86115"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+        <munit-tools:then-return>
+          <munit-tools:error typeId="SALESFORCE:CONNECTIVITY" />
+        </munit-tools:then-return>
+      </munit-tools:mock-when>
+    </munit:behavior>
+    <munit:execution>
+      <munit:set-event
+        doc:name="Set Event"
+        doc:id="3fb5ad54-e6c8-4bab-880a-7e8e46235e59">
+        <munit:attributes
+          value='#[readUrl("classpath://accounts/get_by_id/request/attributes.dwl") as Object {&#10;  class: "org.mule.extension.http.api.HttpRequestAttributes"&#10;}]' />
+      </munit:set-event>
+      <tracing:with-correlation-id
+        doc:name="With CorrelationID"
+        doc:id="fc6a41f9-c587-41ce-b810-9f2680803661"
+        correlationId='#["munit-test-correlationId"]'>
+        <try
+          doc:name="Try"
+          doc:id="1c11d4e5-2a6a-44fa-b37f-478a061f295c">
+          <flow-ref
+            doc:name="wro-ch2-ci-cd-main"
+            doc:id="968d4f9e-ba8b-489e-bad6-b9e005424bce"
+            name="wro-ch2-ci-cd-main" />
+          <error-handler>
+            <on-error-continue
+              enableNotifications="true"
+              logException="true"
+              doc:name="On Error Continue"
+              doc:id="fef1de9b-5636-4caf-b040-b21c3c0ca930"
+              type="SALESFORCE:CONNECTIVITY" />
+          </error-handler>
+        </try>
+      </tracing:with-correlation-id>
+    </munit:execution>
+    <munit:validation>
+      <munit-tools:verify-call
+        doc:name="APIkit Router"
+        doc:id="96b53a9e-d309-46c4-a830-e040f9e4fe1a"
+        processor="apikit:router"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="wro-ch2-ci-cd-config"
+            attributeName="config-ref" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="getAccountById"
+        doc:id="07ffdec4-c446-46bb-9118-36fea988dd69"
+        processor="flow-ref"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="02ff541c-d2eb-45ba-b09a-33eca2eb499d"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="Query Account by Id"
+        doc:id="dbeb576e-7b94-4b73-97bb-efc55451871f"
+        processor="salesforce:query"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="2376046e-8e33-4465-8dbf-ea1187f86115"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:assert-that
+        doc:name="httpStatus is correct"
+        doc:id="533438e8-10e9-4fd7-b314-372dffa3e98f"
+        is="#[MunitTools::equalTo(500)]"
+        message="HTTP status is not correct"
+        expression="#[vars.httpStatus]" />
+      <munit-tools:assert-that
+        doc:name="payload is correct"
+        doc:id="bfbb6df4-52d3-498a-8bcf-759c12985b6e"
+        is='#[output application/json --- MunitTools::equalTo(readUrl("classpath://accounts/get_by_id/response/salesforce-connectivity-error.json"))]'
+        message="Payload is not correct!"
+        expression="#[output application/json --- payload]" />
+    </munit:validation>
+  </munit:test>
+
+  <munit:test
+    name="ShouldFail_GetAccountById_WhenAccountNotFound"
+    doc:id="edb3c55a-ee07-46b9-b679-fb71cb46b7b1"
+    description="GET Account by Id fails due to the Account not being found">
+    <munit:enable-flow-sources>
+      <munit:enable-flow-source value="get:\accounts\(accountId):wro-ch2-ci-cd-config" />
+    </munit:enable-flow-sources>
+    <munit:behavior>
+      <munit-tools:mock-when
+        doc:name="Query Account by Id"
+        doc:id="89f494d4-15b3-434c-a16e-5b5b9a67602a"
+        processor="salesforce:query">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="2376046e-8e33-4465-8dbf-ea1187f86115"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+        <munit-tools:then-return>
+          <munit-tools:payload
+            value="#[[]]"
+            mediaType="application/java" />
+        </munit-tools:then-return>
+      </munit-tools:mock-when>
+    </munit:behavior>
+    <munit:execution>
+      <munit:set-event
+        doc:name="Set Event"
+        doc:id="d75ab44d-c59a-4253-9734-e56ff5a58f61">
+        <munit:attributes
+          value='#[readUrl("classpath://accounts/get_by_id/request/attributes.dwl") as Object {&#10;  class: "org.mule.extension.http.api.HttpRequestAttributes"&#10;}]' />
+      </munit:set-event>
+      <tracing:with-correlation-id
+        doc:name="With CorrelationID"
+        doc:id="83edbf83-7926-4511-bfb9-b136d2256e3b"
+        correlationId='#["munit-test-correlationId"]'>
+        <try
+          doc:name="Try"
+          doc:id="13c6d8e3-d267-47c3-8325-0f6c2f7b973e">
+          <flow-ref
+            doc:name="wro-ch2-ci-cd-main"
+            doc:id="8ed7abcd-6c14-479c-b334-398c43671289"
+            name="wro-ch2-ci-cd-main" />
+          <error-handler>
+            <on-error-continue
+              enableNotifications="true"
+              logException="true"
+              doc:name="On Error Continue"
+              doc:id="984e0a6d-e5c5-4015-80f1-00f493b43410"
+              type="RECORD:NOT_FOUND" />
+          </error-handler>
+        </try>
+      </tracing:with-correlation-id>
+    </munit:execution>
+    <munit:validation>
+      <munit-tools:verify-call
+        doc:name="APIkit Router"
+        doc:id="7d87a86b-e972-4a87-b139-ab5b9d05bcdf"
+        processor="apikit:router"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="wro-ch2-ci-cd-config"
+            attributeName="config-ref" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="getAccountById"
+        doc:id="f5086269-a5fb-40da-bf92-1b01b2924f63"
+        processor="flow-ref"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="02ff541c-d2eb-45ba-b09a-33eca2eb499d"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="Query Account by Id"
+        doc:id="61a810fb-01fd-4666-aa42-317a37dbad32"
+        processor="salesforce:query"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="2376046e-8e33-4465-8dbf-ea1187f86115"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:assert-that
+        doc:name="httpStatus is correct"
+        doc:id="9c364e70-64d0-4710-b780-427cdbcc79c1"
+        is="#[MunitTools::equalTo(404)]"
+        message="HTTP status is not correct"
+        expression="#[vars.httpStatus]" />
+      <munit-tools:assert-that
+        doc:name="payload is correct"
+        doc:id="6a326481-4f8f-4120-b2f3-203591a84cae"
+        is='#[output application/json --- MunitTools::equalTo(readUrl("classpath://accounts/get_by_id/response/record-not-found-error.json"))]'
+        message="Payload is not correct!"
+        expression="#[output application/json --- payload]" />
+    </munit:validation>
+  </munit:test>
+
+  <munit:test
+    name="ShouldSuccessfully_GetAccountById"
+    doc:id="76025738-ac17-4b00-aa7a-cef9464be296"
+    description="GET Account by Id successful">
+    <munit:enable-flow-sources>
+      <munit:enable-flow-source value="get:\accounts\(accountId):wro-ch2-ci-cd-config" />
+    </munit:enable-flow-sources>
+    <munit:behavior>
+      <munit-tools:mock-when
+        doc:name="Query Account by Id"
+        doc:id="85bc80fc-0173-4961-989e-eae0463c6132"
+        processor="salesforce:query">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="2376046e-8e33-4465-8dbf-ea1187f86115"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+        <munit-tools:then-return>
+          <munit-tools:payload
+            value='#[output application/java&#10;---&#10;readUrl("classpath://salesforce/accounts/query_by_id/response/example.dwl")]'
+            mediaType="application/java" />
+        </munit-tools:then-return>
+      </munit-tools:mock-when>
+    </munit:behavior>
+    <munit:execution>
+      <munit:set-event
+        doc:name="Set Event"
+        doc:id="74331564-4c32-43d3-a1dc-d8ccd38f990a">
+        <munit:attributes
+          value='#[readUrl("classpath://accounts/get_by_id/request/attributes.dwl") as Object {&#10;  class: "org.mule.extension.http.api.HttpRequestAttributes"&#10;}]' />
+      </munit:set-event>
+      <flow-ref
+        doc:name="wro-ch2-ci-cd-main"
+        doc:id="e3322768-520f-40f7-9006-a3f1432dcdb7"
+        name="wro-ch2-ci-cd-main" />
+    </munit:execution>
+    <munit:validation>
+      <munit-tools:verify-call
+        doc:name="APIkit Router"
+        doc:id="ac4eab67-a3a2-405b-b2fc-0f00ba1613d0"
+        processor="apikit:router"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="wro-ch2-ci-cd-config"
+            attributeName="config-ref" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="getAccountById"
+        doc:id="e4ae84e5-bcc2-4bfd-aa01-9c736c16af84"
+        processor="flow-ref"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="02ff541c-d2eb-45ba-b09a-33eca2eb499d"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:verify-call
+        doc:name="Query Account by Id"
+        doc:id="f0733781-da46-4d5e-b9f7-6a1fed4683d3"
+        processor="salesforce:query"
+        times="1">
+        <munit-tools:with-attributes>
+          <munit-tools:with-attribute
+            whereValue="2376046e-8e33-4465-8dbf-ea1187f86115"
+            attributeName="doc:id" />
+        </munit-tools:with-attributes>
+      </munit-tools:verify-call>
+      <munit-tools:assert-that
+        doc:name="httpStatus is correct"
+        doc:id="76d2c739-0f43-4996-9b4e-72274feb86cb"
+        is='#[MunitTools::equalTo("200")]'
+        message="HTTP status is not correct"
+        expression="#[vars.httpStatus]" />
+      <munit-tools:assert-that
+        doc:name="payload is correct"
+        doc:id="4cae7a08-1e26-4603-bd67-b1232f5edbf6"
+        is='#[output application/json --- MunitTools::equalTo(readUrl("classpath://accounts/get_by_id/response/successful-response.json"))]'
+        message="Payload is not correct!"
+        expression="#[output application/json --- payload]" />
+    </munit:validation>
+  </munit:test>
+
+</mule>

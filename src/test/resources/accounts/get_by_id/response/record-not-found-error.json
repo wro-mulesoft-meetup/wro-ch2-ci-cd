@@ -1,0 +1,5 @@
+{
+  "correlationId": "munit-test-correlationId",
+  "type": "RECORD:NOT_FOUND",
+  "message": "Account 0012o00003PlCQ3AAN was not found"
+}

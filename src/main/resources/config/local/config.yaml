@@ -1,0 +1,7 @@
+http:
+   port: "8081"
+
+salesforce:
+  consumerKey: "3MVG9Ve.2wqUVx_bD83orXWVURHGqfF09OakFBwladC36cvvz8Un.Ldv6vRd9HmX8maF6rzLnKHm4vauLPWqQ"
+  username: "integration_user@nextviewsandbox.com"
+  tokenEndpoint: "https://login.salesforce.com/services/oauth2/token"
