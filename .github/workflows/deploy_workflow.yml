@@ -56,7 +56,6 @@ jobs:
       - name: Set application name
         id: set-app-name
         run: |
-          repo_name=${{ github.event.repository.name }}
           echo "app_name=${{ steps.set-app-prefix.outputs.app_prefix }}${{ github.event.repository.name }}${{ steps.set-app-suffix.outputs.app_suffix }}" >> $GITHUB_OUTPUT
 
       - name: Set artifact id
