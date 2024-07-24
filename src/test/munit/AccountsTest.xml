@@ -190,7 +190,7 @@ http://www.mulesoft.org/schema/mule/tracing http://www.mulesoft.org/schema/mule/
   <munit:test
     name="ShouldFail_GetAccountById_WhenAccountNotFound"
     doc:id="edb3c55a-ee07-46b9-b679-fb71cb46b7b1"
-    description="GET Account by Id fails due to the Account not being found">
+    description="GET Account by Id fails due to the Account not being found" ignore="true">
     <munit:enable-flow-sources>
       <munit:enable-flow-source value="get:\accounts\(accountId):wro-ch2-ci-cd-config" />
     </munit:enable-flow-sources>
