@@ -277,7 +277,7 @@ http://www.mulesoft.org/schema/mule/tracing http://www.mulesoft.org/schema/mule/
       <munit-tools:assert-that
         doc:name="httpStatus is correct"
         doc:id="9c364e70-64d0-4710-b780-427cdbcc79c1"
-        is="#[MunitTools::equalTo(404)]"
+        is="#[MunitTools::equalTo(400)]"
         message="HTTP status is not correct"
         expression="#[vars.httpStatus]" />
       <munit-tools:assert-that
